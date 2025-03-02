@@ -1,0 +1,22 @@
+# Generated vector database files
+vector_db/
+
+# Data directory (your PDFs)
+data/
+
+# Python virtual environment from uv
+.venv/
+
+# Python bytecode and caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# VSCode settings
+.vscode/
+
+# Logs or temp files
+*.log
+*.tmp
