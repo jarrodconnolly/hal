@@ -13,47 +13,50 @@ def cleanup():
         dist.destroy_process_group()
 atexit.register(cleanup)
 
-# Load Faiss index
+# Load Faiss indices
 embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 vector_store = FAISS.load_local("vector_db", embeddings, "faiss_index.bin", allow_dangerous_deserialization=True)
-
-MODEL_CONFIGS = {
-  "meta-llama/Llama-2-13b-chat-hf": {"quantization": "bitsandbytes", "load_format": "bitsandbytes"},
-  "mistralai/Mistral-7B-Instruct-v0.3": {"quantization": "bitsandbytes", "load_format": "bitsandbytes"},
-}
-
-MODEL_NAME = "meta-llama/Llama-2-13b-chat-hf"  # Swap here
+history_store = FAISS.from_texts([""], embeddings)
 
 # Load vLLM with Llama2-13B
 llm = VLLM(
-    model=MODEL_NAME,
-    gpu_memory_utilization=0.90,  # Lower to 85% for KV cache
-    max_model_len=1024,           # Lower to save VRAM
-    max_num_seqs=256,
-    vllm_kwargs=MODEL_CONFIGS[MODEL_NAME],
-    enforce_eager=False,          # Optimize memory
+    model="meta-llama/Llama-2-13b-chat-hf",
+    gpu_memory_utilization=0.90,
+    max_model_len=1024,
+    max_num_seqs=512,
+    vllm_kwargs={
+        "quantization": "bitsandbytes",
+        "load_format": "bitsandbytes",
+    },
     trust_remote_code=True,
 )
 
-# RAG chain
+# Simple RetrievalQA—no custom prompt
 qa_chain = RetrievalQA.from_chain_type(
     llm=llm,
-    chain_type="stuff",           # Simple context stuffing
-    retriever=vector_store.as_retriever(k=5),  # Top 5 chunks
-    # return_source_documents=True  # For debugging
+    chain_type="stuff",
+    retriever=vector_store.as_retriever(k=5)
 )
 
-def query_hal(qa_chain, query):
-    result = qa_chain.invoke({"query": query})
-    print(f"HAL's Answer: {result['result']}")
-    # print("\nSources:")
-    # for i, doc in enumerate(result['source_documents']):
-    #     print(f"Chunk {i+1}: {doc.page_content[:100]}... (Distance: {doc.metadata.get('distance', 'N/A')})")
+def query_hal(qa_chain, query, history_store):
+    import time
+    start = time.time()
+    docs = history_store.similarity_search(query, k=10)
+    context = "\n".join([doc.page_content for doc in docs if doc.page_content.strip()])
+    full_query = f"Previous context:\n{context}\n\nCurrent query: {query}" if context else query
+    print(f"Before invoke: {time.time() - start:.2f} sec")
+    result = qa_chain.invoke({"query": full_query})
+    print(f"After invoke: {time.time() - start:.2f} sec")
+    answer = result['result'].strip()
+    print(f"HAL Over9000's Answer: {answer}")
+    history_store.add_texts([f"Q: {query}\nA: {answer}"])
+    return answer
 
 if __name__ == "__main__":
-  print("Welcome to HAL Over9000 - Type '.exit' to quit")
-  while True:
-      query = input("Ask HAL Over9000: ")
-      if query.lower() == ".exit":
-          break
-      query_hal(qa_chain, query)
+    print("Welcome to HAL - Type 'exit' to quit")
+    while True:
+        query = input("Question: ")
+        if query.lower() == "exit":
+            print("Goodbye!")
+            break
+        query_hal(qa_chain, query, history_store)
