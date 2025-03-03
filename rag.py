@@ -29,6 +29,7 @@ llm = VLLM(
     model=MODEL_NAME,
     gpu_memory_utilization=0.90,  # Lower to 85% for KV cache
     max_model_len=1024,           # Lower to save VRAM
+    max_num_seqs=256,
     vllm_kwargs=MODEL_CONFIGS[MODEL_NAME],
     enforce_eager=False,          # Optimize memory
     trust_remote_code=True,
@@ -42,7 +43,7 @@ qa_chain = RetrievalQA.from_chain_type(
     # return_source_documents=True  # For debugging
 )
 
-def query_hal(query):
+def query_hal(qa_chain, query):
     result = qa_chain.invoke({"query": query})
     print(f"HAL's Answer: {result['result']}")
     # print("\nSources:")
@@ -50,4 +51,9 @@ def query_hal(query):
     #     print(f"Chunk {i+1}: {doc.page_content[:100]}... (Distance: {doc.metadata.get('distance', 'N/A')})")
 
 if __name__ == "__main__":
-    query_hal("What skills does a lead developer need?")
+  print("Welcome to HAL Over9000 - Type '.exit' to quit")
+  while True:
+      query = input("Ask HAL Over9000: ")
+      if query.lower() == ".exit":
+          break
+      query_hal(qa_chain, query)
