@@ -8,6 +8,8 @@ import numpy as np
 import torch
 import time
 from multiprocessing import Pool
+from langchain_community.vectorstores import FAISS
+from langchain_huggingface import HuggingFaceEmbeddings
 
 DATA_DIR = os.path.expanduser("~/data")
 OUTPUT_DIR = "vector_db"
@@ -86,8 +88,12 @@ def store_in_faiss(embeddings, metadata, chunks, output_dir):
         index = faiss.index_cpu_to_gpu(res, 0, index)
     index.add(embeddings)
     Path(output_dir).mkdir(parents=True, exist_ok=True)
-    faiss.write_index(index if not torch.cuda.is_available() else faiss.index_gpu_to_cpu(index), 
-                      os.path.join(output_dir, "faiss_index.bin"))
+    # Use LangChain FAISS to save index and metadata
+    embedding_model = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
+    vector_store = FAISS.from_texts(chunks, embedding_model, metadatas=[{"source": m[0], "chunk_id": m[1]} for m in metadata])
+    vector_store.save_local(output_dir, "faiss_index.bin")
+    # faiss.write_index(index if not torch.cuda.is_available() else faiss.index_gpu_to_cpu(index), 
+                      # os.path.join(output_dir, "faiss_index.bin.faiss"))
     
     # Save metadata
     with open(os.path.join(output_dir, "metadata.txt"), "w") as f:

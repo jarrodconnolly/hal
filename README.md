@@ -12,34 +12,40 @@
      cd hal
      ```
 
-  2. **Install UV (Package Manager)**
+  1. **Install UV (Package Manager)**
      ```bash
      curl -LsSf https://astral.sh/uv/install.sh | sh
      echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> ~/.bashrc
      source ~/.bashrc
      ```
 
-  3. **Create Virtual Environment**
+  1. **Create Virtual Environment**
      ```bash
      uv venv --python 3.10
      source .venv/bin/activate
      ```
 
-  4. **Install Dependencies**
+  1. **Set Hugging Face Token**  
+     - Get a token from [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens).  
      ```bash
-     uv pip install PyPDF2 sentence-transformers faiss-gpu numpy torch
+     export HF_TOKEN="your-token-here"
      ```
 
-  5. **Add Data**
+  1. **Install Dependencies**
+     ```bash
+     uv pip install .
+     ```
+
+  1. **Add Data**
      - Place PDFs or TXT files in `~/data/` (not tracked by Git).
 
-  6. **Build the Database**
+  1. **Build the Database**
      ```bash
      python build_db.py
      ```
      - Outputs to `vector_db/` (ignored by Git).
 
-  7. **Query the Database**
+  1. **Query the Database**
      ```bash
      python query_db.py
      ```
@@ -53,3 +59,5 @@
 
 ## License
 Proprietary - see [LICENSE](LICENSE) for details. All rights reserved by Jarrod Connolly.
+
+Thanks to Grok (xAI) for code collaboration and ideas.

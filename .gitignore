@@ -20,3 +20,12 @@ __pycache__/
 # Logs or temp files
 *.log
 *.tmp
+
+# hal.egg-info
+hal.egg-info/
+
+# build directory
+build/
+
+# .env file
+.env
