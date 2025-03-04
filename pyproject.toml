@@ -16,6 +16,7 @@ dependencies = [
     "langchain-huggingface>=0.1.2",
     "setuptools>=61.0",
     "bitsandbytes>=0.45.3",
+    "python-docx>=1.1.2",
 ]
 
 [build-system]

@@ -1,4 +1,14 @@
-Hey Grok, I’m building HAL—a local AI assistant running on my RTX 4080 (16 GB VRAM) with Ubuntu/WSL2, Python 3.10, and uv for deps. It’s at https://github.com/jarrodconnolly/hal. So far, HAL ingests PDFs (29 MB now, aiming for 1-5 GB) into Faiss vectors (Sentence-BERT embeddings, chunked files), queries them with a vLLM-powered REPL (Llama-2-13B, bitsandbytes quantized), and answers in ~0.8-1 sec post-warmup (20-sec startup). I want HAL fast (target ~1-sec queries), with persistent memory across runs (not just session), and some HAL-9000 flair—maybe voice input/output or meme replies. How do we rebuild it lean—keep ingestion and vectors, fix vLLM speed (stuck at ~30 sec now), add memory that lasts, and layer in fun features without breaking it? What’s the simplest, scalable stack to get there? The TODO.md file in the repository has some ideas we talked about for next steps.
+
+
+Worth Playing?: Totally! Bigger or specialized embeddings could boost precision, especially for dense docs like your “Lead Developer Career Guide.” Options:
+all-RoBERTa-Large-v1 (1024 dims): Deeper semantics, ~400MB, slower but smarter—could catch subtle career guide details.
+
+multi-qa-MiniLM-L6-cos-v1: Tuned for question-answering, might align better with HAL’s Q&A style.
+
+BAAI/bge-large-en-v1.5 (1024 dims): State-of-the-art for text retrieval, ~1GB—pricey on VRAM but top-notch.
+
+Text-Only: Stick with "all-MiniLM-L6-v2" for now—test bge-large-en-v1.5 if RAG feels off.
+
 
 
 

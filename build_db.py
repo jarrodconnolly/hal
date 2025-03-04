@@ -10,6 +10,8 @@ import time
 from multiprocessing import Pool
 from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
+from docx import Document
+import json
 
 DATA_DIR = os.path.expanduser("~/data")
 OUTPUT_DIR = "vector_db"
@@ -39,14 +41,27 @@ def extract_text_from_txt(file_path):
         print(f"Error reading {file_path}: {e}")
         return ""
 
+def extract_text_from_docx(file_path):
+    try:
+        doc = Document(file_path)
+        text = ""
+        for para in doc.paragraphs:
+            text += para.text + "\n"
+        return text
+    except Exception as e:
+        print(f"Error reading {file_path}: {e}")
+        return ""
+
 def split_text(text, chunk_size=CHUNK_SIZE):
     return [text[i:i + chunk_size] for i in range(0, len(text), chunk_size)]
 
 def process_file(file_path):
     if file_path.lower().endswith(".pdf"):
         text = extract_text_from_pdf(file_path)
-    elif file_path.lower().endswith(".txt"):
+    elif file_path.lower().endswith((".txt", ".md")):
         text = extract_text_from_txt(file_path)
+    elif file_path.lower().endswith(".docx"):
+        text = extract_text_from_docx(file_path)
     else:
         return [], []
     if text:
@@ -54,11 +69,10 @@ def process_file(file_path):
         return file_chunks, [(file_path, i) for i in range(len(file_chunks))]
     return [], []
 
-def process_files(data_dir):
+def process_files(file_paths):
     start_time = time.time()
     chunks = []
     metadata = []
-    file_paths = [os.path.join(root, file) for root, _, files in os.walk(data_dir) for file in files]
     with Pool() as pool:
         results = pool.map(process_file, file_paths)
     for file_chunks, file_metadata in results:
@@ -81,19 +95,15 @@ def generate_embeddings(chunks, model_name=EMBEDDING_MODEL):
 def store_in_faiss(embeddings, metadata, chunks, output_dir):
     start_time = time.time()
     embeddings = np.array(embeddings).astype("float32")
-    dimension = embeddings.shape[1]
-    index = faiss.IndexFlatL2(dimension)
-    if torch.cuda.is_available():
-        res = faiss.StandardGpuResources()
-        index = faiss.index_cpu_to_gpu(res, 0, index)
-    index.add(embeddings)
     Path(output_dir).mkdir(parents=True, exist_ok=True)
-    # Use LangChain FAISS to save index and metadata
     embedding_model = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
-    vector_store = FAISS.from_texts(chunks, embedding_model, metadatas=[{"source": m[0], "chunk_id": m[1]} for m in metadata])
+    # Use IndexIDMap for removal support
+    vector_store = FAISS.from_texts(
+        chunks, 
+        embedding_model, 
+        metadatas=[{"source": m[0], "chunk_id": m[1]} for m in metadata]
+    )
     vector_store.save_local(output_dir, "faiss_index.bin")
-    # faiss.write_index(index if not torch.cuda.is_available() else faiss.index_gpu_to_cpu(index), 
-                      # os.path.join(output_dir, "faiss_index.bin.faiss"))
     
     # Save metadata
     with open(os.path.join(output_dir, "metadata.txt"), "w") as f:
@@ -105,10 +115,9 @@ def store_in_faiss(embeddings, metadata, chunks, output_dir):
     Path(chunks_dir).mkdir(exist_ok=True)
     chunk_idx = 0
     for file_path, _ in metadata:
-        # Use a sanitized filename (replace special chars)
         file_name = "".join(c if c.isalnum() or c in "._-" else "_" for c in os.path.basename(file_path))
         chunk_file = os.path.join(chunks_dir, f"{file_name}.txt")
-        if not os.path.exists(chunk_file):  # Write only once per file
+        if not os.path.exists(chunk_file):
             file_chunks = chunks[chunk_idx:chunk_idx + sum(1 for m in metadata if m[0] == file_path)]
             with open(chunk_file, "w", encoding="utf-8") as f:
                 f.write("\n---\n".join(file_chunks) + "\n---\n")
@@ -118,23 +127,80 @@ def store_in_faiss(embeddings, metadata, chunks, output_dir):
     print(f"Faiss storage took {elapsed:.2f} seconds")
     print(f"Stored {len(embeddings)} embeddings in {output_dir}")
 
-def wipe_and_reload(data_dir, output_dir):
+def update_vector_store(data_dir, output_dir):
     total_start = time.time()
-    if os.path.exists(output_dir):
-        shutil.rmtree(output_dir)
-        print(f"Cleared existing database at {output_dir}")
-    chunks, metadata = process_files(data_dir)
+    state_file = os.path.join(output_dir, "state.json")
+    
+    # Load previous state or init
+    if os.path.exists(state_file):
+        with open(state_file, "r") as f:
+            prev_state = json.load(f)
+    else:
+        prev_state = {}
+
+    # Get current file states
+    current_state = {}
+    file_paths = [os.path.join(root, file) for root, _, files in os.walk(data_dir) for file in files]
+    for fp in file_paths:
+        if fp.lower().endswith((".pdf", ".txt", ".md", ".docx")):
+            current_state[fp] = os.path.getmtime(fp)
+
+    # Detect changes
+    to_process = [fp for fp in file_paths if fp not in prev_state or prev_state[fp] != current_state[fp]]
+    if not os.path.exists(output_dir) or not file_paths:
+        print("Full rebuild required.")
+        chunks, metadata = process_files(file_paths)
+        if not chunks:
+            print("No data to process.")
+            return
+        embeddings = generate_embeddings(chunks)
+        store_in_faiss(embeddings, metadata, chunks, output_dir)
+        with open(state_file, "w") as f:
+            json.dump(current_state, f)
+        print(f"Full build stored {len(chunks)} chunks in {time.time() - total_start:.2f} seconds")
+        return
+
+    # Process only changed/new files
+    if not to_process:
+        print("No changes detected.")
+        return
+    chunks, metadata = process_files(to_process)
     if not chunks:
-        print("No data to process. Check your data directory.")
+        print("No new/changed data to process.")
         return
     embeddings = generate_embeddings(chunks)
-    store_in_faiss(embeddings, metadata, chunks, output_dir)
-    total_elapsed = time.time() - total_start
-    print(f"Total process took {total_elapsed:.2f} seconds")
+
+    # Load existing FAISS
+    embedding_model = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
+    vector_store = FAISS.load_local(output_dir, embedding_model, "faiss_index.bin", allow_dangerous_deserialization=True)
+    
+    # Remove old embeddings for changed files
+    changed_files = [fp for fp in to_process if fp in prev_state]
+    if changed_files:
+        ids_to_remove = []
+        for i, doc in enumerate(vector_store.docstore._dict.values()):
+            if doc.metadata["source"] in changed_files:
+                ids_to_remove.append(i)
+        if ids_to_remove:
+            vector_store.index.remove_ids(np.array(ids_to_remove))
+            print(f"Removed {len(ids_to_remove)} stale chunks for {len(changed_files)} changed files")
+
+    # Add new embeddings directly (no merge_from)
+    vector_store.add_texts(
+        texts=chunks,
+        metadatas=[{"source": m[0], "chunk_id": m[1]} for m in metadata]
+    )
+    vector_store.save_local(output_dir, "faiss_index.bin")
+
+    # Update state
+    with open(state_file, "w") as f:
+        json.dump(current_state, f)
+    
+    print(f"Updated with {len(chunks)} new/changed chunks in {time.time() - total_start:.2f} seconds")
 
 def main():
     print("Starting text extraction, embedding, and storage process...")
-    wipe_and_reload(DATA_DIR, OUTPUT_DIR)
+    update_vector_store(DATA_DIR, OUTPUT_DIR)
     print("Process complete!")
 
 if __name__ == "__main__":
