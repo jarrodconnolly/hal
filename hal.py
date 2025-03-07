@@ -72,25 +72,24 @@ qa_chain = RetrievalQA.from_chain_type(
 def query_hal(qa_chain, query, history_store):
     import time
     from transformers import AutoTokenizer
-    tokenizer = AutoTokenizer.from_pretrained("TheBloke/Llama-2-13B-chat-GPTQ", legacy=False)
+    tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.2-3B-Instruct", legacy=False)
     start = time.time()
     if not query.strip():
         print("No question provided.")
         return None
-    # Fetch relevant history
     docs = history_store.similarity_search(query, k=2)
-    context = "\n".join([doc.page_content for doc in docs])
-    full_query = f"Previous context:\n{context}\n\nCurrent query: {query}" if context else query
+    history_context = "\n".join([doc.page_content for doc in docs])
+    rag_docs = vector_store.similarity_search(query, k=5)
+    rag_context = "\n".join([doc.page_content for doc in rag_docs])
+    full_query = f"Use this info to answer:\n{rag_context}\n\nQuestion: {query}" if rag_context else query
     print(f"Full query: {full_query}")
     print(f"Before invoke: {time.time() - start:.2f} sec")
-    # Invoke RAG chain
     result = qa_chain.invoke({"query": full_query})
     print(f"After invoke: {time.time() - start:.2f} sec")
     answer = result["result"].strip()
     token_count = len(tokenizer.encode(answer))
     print(f"HAL's Answer: {answer}")
     print(f"Token count: {token_count}")
-    # Update history
     history_store.add_texts([f"Q: {query}\nA: {answer}"])
     return answer
 
