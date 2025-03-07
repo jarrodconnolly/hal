@@ -1,61 +1,27 @@
-  # HAL - Highly Adaptable Learning AI
+# HAL: Highly Adaptable Learning AI
 
-  HAL is a Python-based AI project for processing text data (PDFs, TXT) into a Faiss vector database and querying it with embeddings. Built for scale (1-5 GB+), it’s ready for LLM integration and future speech capabilities. Inspired by *2001: A Space Odyssey*.
+HAL is your precision-crafted AI wingman, built to sling quality answers (50-100 tokens) from a mountain of tech docs—PDFs, DOCX, TXT—in a flash. Powered by an RTX 4080 (16GB VRAM, 14.1GB peak), i9-13900KF (20-core shredder), and 128GB RAM, HAL devours GBs (421MB in 232s) and retrieves in <0.1s. Packed with 14,658 chunks of compiler, algorithm, and data system gold, it’s your go-to for razor-sharp dev insights—fast.
 
-  ## Setup
+## Features
+- **Blazing Ingestion**: 421MB (28 PDFs) in 232s—3.42s extraction, 227s embeddings, 1.63s HNSW FAISS build.
+- **Snappy Retrieval**: <0.1s via HNSW—queries land in ~0.7-1.3s total.
+- **Session Memory**: Tracks your name or last ask—resets on restart, keeps it lean.
+- **Scalable AF**: From 444 chunks (8s) to 14k (232s)—GBs? Bring it on.
 
-  Run HAL on Ubuntu (WSL2 or native) with Python 3.10, leveraging a GPU (e.g., RTX 4080).
+## Tech Stack
+- **`build_db.py`**: Ingests with `thenlper/gte-large` (768D embeddings), HNSW FAISS—14,658 chunks in 232s.
+- **`hal.py`**: Runs Llama-3.2-3B via vLLM, RAG with in-run history—answers in ~1s.
+- **Hardware**: RTX 4080 (14.1GB peak), i9-13900KF, 128GB RAM—speed demons unleashed.
 
-  1. **Clone the Repo**
-     ```bash
-     git clone https://github.com/jarrodconnolly/hal.git
-     cd hal
-     ```
+## Current State
+- **Data**: 421MB, 28 PDFs
+- **Perf**: 232s build (14k chunks), ~1s queries—scales to GBs with <0.1s retrieval.
+- **Next**: Crank it to 1GB+—VRAM’s near 16GB max, might shard for bigger hauls.
 
-  1. **Install UV (Package Manager)**
-     ```bash
-     curl -LsSf https://astral.sh/uv/install.sh | sh
-     echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> ~/.bashrc
-     source ~/.bashrc
-     ```
-
-  1. **Create Virtual Environment**
-     ```bash
-     uv venv --python 3.10
-     source .venv/bin/activate
-     ```
-
-  1. **Set Hugging Face Token**  
-     - Get a token from [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens).  
-     ```bash
-     export HF_TOKEN="your-token-here"
-     ```
-
-  1. **Install Dependencies**
-     ```bash
-     uv pip install .
-     ```
-
-  1. **Add Data**
-     - Place PDFs or TXT files in `~/data/` (not tracked by Git).
-
-  1. **Build the Database**
-     ```bash
-     python build_db.py
-     ```
-     - Outputs to `vector_db/` (ignored by Git).
-
-  1. **Query the Database**
-     ```bash
-     python query_db.py
-     ```
-     - Try: "What skills does a lead developer need?"
-
-  ## Requirements
-  - Python 3.10
-  - GPU with CUDA (e.g., NVIDIA RTX 4080)
-  - Ubuntu (WSL2 or native)
-  - ~1-5 GB disk space for data and vectors
+## Hot Deets
+- **GPU Flex**: 4080 peaked at 14.1GB—no sweat, ready for more.
+- **CPU Shred**: i9’s 20 cores ripped 14k chunks in 3.42s—extraction’s a breeze.
+- **Books**: 28 dev bibles—HAL’s a walking PhD in compilers and data systems.
 
 ## License
 Proprietary - see [LICENSE](LICENSE) for details. All rights reserved by Jarrod Connolly.

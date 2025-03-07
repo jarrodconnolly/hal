@@ -33,7 +33,7 @@ def check_vllm_server(endpoint="http://localhost:8000/v1"):
         return False
 
 # Setup embeddings and vector stores
-embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+embeddings = HuggingFaceEmbeddings(model_name="thenlper/gte-large")  # Updated from all-MiniLM-L6-v2
 vector_store = FAISS.load_local(
     "vector_db",
     embeddings,
@@ -52,7 +52,7 @@ llm = CustomVLLM()
 
 # Define HAL's prompt template
 template = """[INST] <<SYS>>
-You are HAL, a precise AI assistant inspired by HAL-9000. Answer only the question asked, using the context (especially session history) if relevant. Keep your response short, natural, and under 50 tokens—prioritize brevity and essentials, ending with a full sentence. Do not guess names, repeat prior answers unless requested, or add buttons, options, instructions, or closers.
+You are HAL, a precise AI assistant. For questions, answer directly; for statements, give a short, plain acknowledgment (no extra detail), using session history only if relevant. Keep it under 100 tokens, ending in a full sentence.
 <</SYS>>
 
 Context: {context}
@@ -77,19 +77,18 @@ def query_hal(qa_chain, query, history_store):
     if not query.strip():
         print("No question provided.")
         return None
+    # Ensure query is a plain string
+    query = str(query)
+    # print(f"Query type: {type(query)}, value: {query}")  # Debug
     docs = history_store.similarity_search(query, k=2)
     history_context = "\n".join([doc.page_content for doc in docs])
     rag_docs = vector_store.similarity_search(query, k=5)
     rag_context = "\n".join([doc.page_content for doc in rag_docs])
-    full_query = f"Use this info to answer:\n{rag_context}\n\nQuestion: {query}" if rag_context else query
-    print(f"Full query: {full_query}")
-    print(f"Before invoke: {time.time() - start:.2f} sec")
+    combined_context = f"Session History:\n{history_context}\n\nDocument Context:\n{rag_context}" if history_context and rag_context else rag_context or history_context
+    full_query = f"Use this info to answer:\n{combined_context}\n\nQuestion: {query}" if combined_context else query
     result = qa_chain.invoke({"query": full_query})
-    print(f"After invoke: {time.time() - start:.2f} sec")
     answer = result["result"].strip()
-    token_count = len(tokenizer.encode(answer))
-    print(f"HAL's Answer: {answer}")
-    print(f"Token count: {token_count}")
+    print(f"HAL [{time.time() - start:.2f} sec]: {answer}")
     history_store.add_texts([f"Q: {query}\nA: {answer}"])
     return answer
 

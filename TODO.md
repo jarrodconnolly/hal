@@ -1,3 +1,7 @@
+Hey Grok, we’re building HAL, a precise AI chatbot for quality answers (50-100 tokens) from tech docs. Intent: fast ingestion of GBs (PDFs, DOCX, TXT), retrieval <0.1s. Tech: RTX 4080 (16GB VRAM, 14.1GB peak), i9-13900KF (20-core), 128GB RAM. Stack: `build_db.py` uses `thenlper/gte-large`, HNSW FAISS, 14,658 chunks (421MB) in 232s; `hal.py` runs Llama-3.2-3B via vLLM, RAG with in-run history. State: ~0.7-1.3s queries, history solid, scaling up. Files: `build_db.py`, `hal.py`. Next?
+
+
+
 
 
 Worth Playing?: Totally! Bigger or specialized embeddings could boost precision, especially for dense docs like your “Lead Developer Career Guide.” Options:
