@@ -114,6 +114,7 @@ async def query_hal_stream(request: QueryRequest):
 
     async def stream_response():
         generation_start = time.time()
+        ttfb = None
         answer = ""
         payload = {
             "model": llm.model_name,
@@ -131,13 +132,16 @@ async def query_hal_stream(request: QueryRequest):
                             chunk_json = json.loads(data)
                             content = chunk_json["choices"][0]["delta"].get("content", "")
                             if content:
+                                if ttfb is None:
+                                    ttfb = time.time() - start
                                 answer += content
                                 yield content
         generation_time = time.time() - generation_start
         total_time = time.time() - start
-        timings = {"total": total_time, "history": history_time, "qdrant": qdrant_time, "generation": generation_time}
+        timings = {"total": total_time, "history": history_time, "qdrant": qdrant_time, "generation": generation_time, "ttfb": ttfb}
         logging.info(f"Query: {query} | Response: {answer} | Timings: {timings}")
         history_store.add_texts([f"Q: {query}\nA: {answer}"])
+        yield f"\n\nTIMINGS:{json.dumps(timings)}"  # Clear separator
 
     return StreamingResponse(stream_response(), media_type="text/plain")
 

@@ -7,6 +7,7 @@ import asyncio
 import logging
 from qdrant_client import QdrantClient
 from rich.text import Text
+import json
 
 logging.basicConfig(filename="hal_ui.log", level=logging.INFO, format="%(message)s")
 
@@ -61,7 +62,7 @@ class HALApp(App):
         with VerticalScroll():
             yield Static(Text("█"), id="console")
         yield Static(
-            f"{self.chunk_count} Chunks | History 0.00s | Retrieval 0.00s | Generation 0.00s | Total 0.00s",
+            f"{self.chunk_count} Chunks | Hist 0.00s | Retr 0.00s | Gen 0.00s | Tot 0.00s | Tok 0 | TTFB 0.00s",
             id="status",
         )
 
@@ -79,22 +80,29 @@ class HALApp(App):
                 "POST", "http://localhost:8001/query_stream", json={"query": query}
             ) as response:
                 answer = ""
+                timings = {}
+                buffer = ""
                 async for chunk in response.aiter_text():
-                    answer += chunk
+                    buffer += chunk
+                    if "\n\nTIMINGS:" in buffer:
+                        parts = buffer.split("\n\nTIMINGS:", 1)
+                        answer = parts[0]
+                        timings = json.loads(parts[1])
+                        self.console_history += answer
+                        break
                     self.console_history += chunk
                     console.update(Text(self.console_history + "█"))
                     await asyncio.sleep(0.01)
+                else:
+                    self.console_history += buffer  # Fallback if no timings
                 self.console_history += "\n\n"
                 self.current_input = ""
                 console.update(Text(self.console_history + "█"))
-            timings_response = await client.post(
-                "http://localhost:8001/query", json={"query": query}
-            )
-            timings = timings_response.json().get("timings", {})
+            token_count = len(answer.split())
             status.update(
-                f"{self.chunk_count} Chunks | History {timings.get('history', 0):.2f}s | "
-                f"Retrieval {timings.get('qdrant', 0):.2f}s | Generation {timings.get('generation', 0):.2f}s | "
-                f"Total {timings.get('total', 0):.2f}s"
+                f"{self.chunk_count} Chunks | Hist {timings.get('history', 0):.2f}s | "
+                f"Retr {timings.get('qdrant', 0):.2f}s | Gen {timings.get('generation', 0):.2f}s | "
+                f"Tot {timings.get('total', 0):.2f}s | Tok {token_count} | TTFB {timings.get('ttfb', 0):.2f}s"
             )
 
     def on_key(self, event: Key) -> None:
