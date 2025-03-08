@@ -14,7 +14,7 @@ class HALApp(App):
         background: black;
     }
     Header {
-        color: cyan;
+        color: #E0FFFF;
         background: black;
         height: 3;
     }
@@ -26,13 +26,15 @@ class HALApp(App):
         border: tall green;
     }
     #console {
-        color: cyan;
+        color: #E0FFFF;
         background: black;
+        content-align: left top;
+        padding: 0 1;
     }
     #status {
-        color: cyan;
+        color: #E0FFFF;
         background: black;
-        padding-left: 2;
+        padding-left: 1;
     }
     """
 
@@ -44,7 +46,7 @@ class HALApp(App):
     def compose(self) -> ComposeResult:
         yield Header()
         with VerticalScroll():
-            yield Static("", id="console")
+            yield Static("█", id="console")
         yield Static("14,658 Chunks | History 0.00s | Retrieval 0.00s | Generation 0.00s | Total 0.00s", id="status")
 
     def on_mount(self):
@@ -56,18 +58,18 @@ class HALApp(App):
         scroll = self.query_one(VerticalScroll)
         if event.key == "enter":
             if self.current_input:
-                self.console_history += f"> {self.current_input}\nHAL: Understood - {self.current_input}\n"
+                self.console_history += f"{self.current_input}\nHAL: Understood - {self.current_input}\n\n"  # Double newline after HAL
                 self.current_input = ""
-                console.update(self.console_history)
+                console.update(f"{self.console_history}█")
             scroll.scroll_end()
         elif event.character and event.is_printable:
             self.current_input += event.character
-            console.update(f"{self.console_history}> {self.current_input}")
+            console.update(f"{self.console_history}{self.current_input}█")
             logging.info(f"Typed: {self.current_input}")
             scroll.scroll_end()
         elif event.key == "backspace":
             self.current_input = self.current_input[:-1]
-            console.update(f"{self.console_history}> {self.current_input}")
+            console.update(f"{self.console_history}{self.current_input}█")
             scroll.scroll_end()
 
 if __name__ == "__main__":
