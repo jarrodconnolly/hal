@@ -539,6 +539,8 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "faiss-gpu-cu12" },
+    { name = "fastapi" },
+    { name = "httpx" },
     { name = "langchain" },
     { name = "langchain-community" },
     { name = "langchain-huggingface" },
@@ -550,12 +552,15 @@ dependencies = [
     { name = "sentence-transformers" },
     { name = "textual" },
     { name = "torch" },
+    { name = "uvicorn" },
     { name = "vllm" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "faiss-gpu-cu12", specifier = ">=1.10.0" },
+    { name = "fastapi", specifier = ">=0.115.11" },
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "langchain", specifier = ">=0.3.3" },
     { name = "langchain-community", specifier = ">=0.3.3" },
     { name = "langchain-huggingface", specifier = ">=0.1.0" },
@@ -567,6 +572,7 @@ requires-dist = [
     { name = "sentence-transformers", specifier = ">=3.1.1" },
     { name = "textual", specifier = ">=2.1.2" },
     { name = "torch", specifier = ">=2.4.1" },
+    { name = "uvicorn", specifier = ">=0.34.0" },
     { name = "vllm", specifier = ">=0.6.2" },
 ]
 

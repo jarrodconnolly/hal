@@ -1,42 +1,38 @@
+from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 from custom_vllm import CustomVLLM
 from langchain.chains import RetrievalQA
 from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain.prompts import PromptTemplate
-from langchain_core.retrievers import BaseRetriever
-from langchain_core.documents import Document
-from dotenv import load_dotenv
-import requests
-import torch.distributed as dist
-import atexit
-import os
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import SearchParams
+from langchain_core.retrievers import BaseRetriever
+from langchain_core.documents import Document
 from typing import List
+import logging
+import httpx
+import json
+import time
 
-load_dotenv()
-
-def cleanup():
-    if dist.is_initialized():
-        dist.destroy_process_group()
-atexit.register(cleanup)
-
-def check_vllm_server(endpoint="http://localhost:8000/v1"):
-    try:
-        response = requests.get(f"{endpoint}/models", timeout=5)
-        if response.status_code == 200:
-            print("Connected to vLLM server successfully.")
-            return True
-        else:
-            raise Exception(f"Server responded with status {response.status_code}")
-    except Exception as e:
-        print(f"Error: Could not connect to vLLM server at {endpoint} - {str(e)}")
-        print("Please start the server with: python -m vllm.entrypoints.openai.api_server --model meta-llama/Llama-3.2-3B-Instruct ...")
-        return False
+logging.basicConfig(filename="hal_api.log", level=logging.INFO, format="%(message)s")
+app = FastAPI()
 
 embeddings = HuggingFaceEmbeddings(model_name="thenlper/gte-large")
 client = QdrantClient("localhost", port=6333)
 collection_name = "hal_docs"
+history_store = FAISS.from_texts([""], embeddings)
+llm = CustomVLLM()
+
+template = """[INST] <<SYS>>
+You are HAL, a precise AI assistant. For questions, answer directly; for statements, give a short, plain acknowledgment (no extra detail), using session history only if relevant. Keep it under 100 tokens, ending in a full sentence.
+<</SYS>>
+
+Context: {context}
+
+Question: {question} [/INST]"""
+prompt = PromptTemplate(input_variables=["context", "question"], template=template)
 
 class QdrantRetriever(BaseRetriever):
     def _get_relevant_documents(self, query: str) -> List[Document]:
@@ -51,30 +47,10 @@ class QdrantRetriever(BaseRetriever):
         return [
             Document(
                 page_content=result.payload.get("content", ""),
-                metadata={
-                    "source": result.payload.get("source", ""),
-                    "chunk_id": result.payload.get("chunk_id", 0)
-                }
+                metadata={"source": result.payload.get("source", ""), "chunk_id": result.payload.get("chunk_id", 0)}
             )
             for result in search_results
         ]
-
-history_store = FAISS.from_texts([""], embeddings)
-
-server_endpoint = "http://localhost:8000/v1"
-if not check_vllm_server(server_endpoint):
-    exit(1)
-
-llm = CustomVLLM()
-
-template = """[INST] <<SYS>>
-You are HAL, a precise AI assistant. For questions, answer directly; for statements, give a short, plain acknowledgment (no extra detail), using session history only if relevant. Keep it under 100 tokens, ending in a full sentence.
-<</SYS>>
-
-Context: {context}
-
-Question: {question} [/INST]"""
-prompt = PromptTemplate(input_variables=["context", "question"], template=template)
 
 qa_chain = RetrievalQA.from_chain_type(
     llm=llm,
@@ -83,50 +59,88 @@ qa_chain = RetrievalQA.from_chain_type(
     chain_type_kwargs={"prompt": prompt},
 )
 
-def query_hal(qa_chain, query, history_store):
-    import time
-    from transformers import AutoTokenizer
-    tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.2-3B-Instruct", legacy=False)
+class QueryRequest(BaseModel):
+    query: str
+
+@app.post("/query")
+async def query_hal(request: QueryRequest):
     start = time.time()
-    if not query.strip():
-        print("No question provided.")
-        return None
-    query = str(query)
-    
-    # History retrieval
+    query = request.query.strip()
+    if not query:
+        return {"response": "No question provided.", "timings": {}}
+
     history_start = time.time()
     docs = history_store.similarity_search(query, k=2)
     history_context = "\n".join([doc.page_content for doc in docs])
     history_time = time.time() - history_start
-    
-    # Qdrant retrieval (once)
+
     qdrant_start = time.time()
     rag_docs = qa_chain.retriever._get_relevant_documents(query)
     qdrant_time = time.time() - qdrant_start
-    
-    # Combine context
+
     rag_context = "\n".join([doc.page_content for doc in rag_docs])
-    combined_context = f"Session History:\n{history_context}\n\nDocument Context:\n{rag_context}" if history_context and rag_context else rag_context or history_context
-    
-    # Generation with pre-fetched docs, bypassing retriever
+    combined_context = f"Session History:\n{history_context}\n\nDocument Context:\n{rag_context}" if history_context else rag_context
+    final_prompt = qa_chain.combine_documents_chain.llm_chain.prompt.format(context=combined_context, question=query)
+
     generation_start = time.time()
-    final_prompt = qa_chain.combine_documents_chain.llm_chain.prompt.format(
-        context=combined_context,
-        question=query
-    )
-    answer = llm._call(final_prompt)  # Fix: Use llm directly, not qa_chain.llm
+    answer = llm._call(final_prompt)
     generation_time = time.time() - generation_start
-    
+
     total_time = time.time() - start
-    print(f"HAL [total: {total_time:.2f} sec, history: {history_time:.2f} sec, qdrant: {qdrant_time:.2f} sec, generation: {generation_time:.2f} sec]: {answer}")
+    timings = {"total": total_time, "history": history_time, "qdrant": qdrant_time, "generation": generation_time}
+    logging.info(f"Query: {query} | Response: {answer} | Timings: {timings}")
     history_store.add_texts([f"Q: {query}\nA: {answer}"])
-    return answer
+    return {"response": answer, "timings": timings}
+
+@app.post("/query_stream")
+async def query_hal_stream(request: QueryRequest):
+    start = time.time()
+    query = request.query.strip()
+    if not query:
+        return StreamingResponse(iter(["No question provided."]), media_type="text/plain")
+
+    history_start = time.time()
+    docs = history_store.similarity_search(query, k=2)
+    history_context = "\n".join([doc.page_content for doc in docs])
+    history_time = time.time() - history_start
+
+    qdrant_start = time.time()
+    rag_docs = qa_chain.retriever._get_relevant_documents(query)
+    qdrant_time = time.time() - qdrant_start
+
+    rag_context = "\n".join([doc.page_content for doc in rag_docs])
+    combined_context = f"Session History:\n{history_context}\n\nDocument Context:\n{rag_context}" if history_context else rag_context
+    final_prompt = qa_chain.combine_documents_chain.llm_chain.prompt.format(context=combined_context, question=query)
+
+    async def stream_response():
+        generation_start = time.time()
+        answer = ""
+        payload = {
+            "model": llm.model_name,
+            "messages": [{"role": "user", "content": final_prompt}],
+            "max_tokens": 512,
+            "temperature": 0.7,
+            "stream": True
+        }
+        async with httpx.AsyncClient() as client:
+            async with client.stream("POST", f"{llm.server_endpoint}/chat/completions", json=payload, timeout=llm.timeout) as response:
+                async for chunk in response.aiter_lines():
+                    if chunk.startswith("data: "):
+                        data = chunk[6:]
+                        if data != "[DONE]":
+                            chunk_json = json.loads(data)
+                            content = chunk_json["choices"][0]["delta"].get("content", "")
+                            if content:
+                                answer += content
+                                yield content
+        generation_time = time.time() - generation_start
+        total_time = time.time() - start
+        timings = {"total": total_time, "history": history_time, "qdrant": qdrant_time, "generation": generation_time}
+        logging.info(f"Query: {query} | Response: {answer} | Timings: {timings}")
+        history_store.add_texts([f"Q: {query}\nA: {answer}"])
+
+    return StreamingResponse(stream_response(), media_type="text/plain")
 
 if __name__ == "__main__":
-    print("Welcome to HAL - Type 'exit' to quit")
-    while True:
-        query = input("Question: ")
-        if query.lower() == "exit":
-            print("Goodbye!")
-            break
-        query_hal(qa_chain, query, history_store)
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8001)
