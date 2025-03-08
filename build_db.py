@@ -2,24 +2,21 @@ import os
 from pathlib import Path
 import pypdfium2 as pdfium
 from sentence_transformers import SentenceTransformer
-import faiss
 import numpy as np
 import torch
 import time
 from multiprocessing import Pool
-from langchain_community.vectorstores import FAISS
-from langchain_community.docstore.in_memory import InMemoryDocstore
-from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 from docx import Document as DocxDocument
 import json
+from qdrant_client import QdrantClient
+from qdrant_client.http import models as rest
 
 DATA_DIR = os.path.expanduser("~/data")
 OUTPUT_DIR = "vector_db"
 CHUNK_SIZE = 2000
 EMBEDDING_MODEL = "thenlper/gte-large"
 HNSW_M = 32
-HNSW_EF_CONSTRUCTION = 200
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
@@ -91,48 +88,14 @@ def process_files(file_paths):
 def generate_embeddings(chunks, model_name=EMBEDDING_MODEL):
     start_time = time.time()
     model = SentenceTransformer(model_name, device=device)
-    embeddings = model.encode(chunks, batch_size=256, show_progress_bar=True)  # Safe VRAM
+    embeddings = model.encode(chunks, batch_size=256, show_progress_bar=True)
     elapsed = time.time() - start_time
     print(f"Embedding generation took {elapsed:.2f} seconds")
     return embeddings
 
-def store_in_faiss(embeddings, metadata, chunks, output_dir):
-    start_time = time.time()
-    embeddings = np.array(embeddings).astype("float32")
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    
-    # Build HNSW index
-    d = embeddings.shape[1]
-    index = faiss.IndexHNSWFlat(d, HNSW_M)
-    index.hnsw.efConstruction = HNSW_EF_CONSTRUCTION
-    index.add(embeddings)
-    
-    # Use LangChain Document
-    docs = [Document(page_content=chunk, metadata={"source": m[0], "chunk_id": m[1]}) for chunk, m in zip(chunks, metadata)]
-    docstore = InMemoryDocstore({i: doc for i, doc in enumerate(docs)})
-    
-    # Wrap in LangChain FAISS
-    vector_store = FAISS(
-        embedding_function=embedding_model,
-        index=index,
-        docstore=docstore,
-        index_to_docstore_id={i: i for i in range(len(embeddings))},
-    )
-    
-    vector_store.save_local(output_dir, "faiss_index.bin")
-    with open(os.path.join(output_dir, "metadata.json"), "w") as f:
-        json.dump(metadata, f)
-    with open(os.path.join(output_dir, "chunks.json"), "w") as f:
-        json.dump(chunks, f)
-    elapsed = time.time() - start_time
-    print(f"Faiss storage took {elapsed:.2f} seconds")
-    print(f"Stored {len(embeddings)} embeddings in {output_dir}")
-
 def update_vector_store(data_dir, output_dir):
     total_start = time.time()
     state_file = os.path.join(output_dir, "state.json")
-    chunks_file = os.path.join(output_dir, "chunks.json")
-    metadata_file = os.path.join(output_dir, "metadata.json")
     
     prev_state = {}
     if os.path.exists(state_file):
@@ -145,17 +108,36 @@ def update_vector_store(data_dir, output_dir):
         if fp.lower().endswith((".pdf", ".txt", ".md", ".docx")):
             current_state[fp] = os.path.getmtime(fp)
 
-    if not os.path.exists(output_dir) or not file_paths:
-        print("Full rebuild required.")
-        chunks, metadata = process_files(file_paths)
-        if not chunks:
-            print("No data to process.")
-            return
-        embeddings = generate_embeddings(chunks)
-        store_in_faiss(embeddings, metadata, chunks, output_dir)
+    client = QdrantClient("localhost", port=6333, timeout=300)
+    collection_name = "hal_docs"
+
+    # Reset collection if state mismatch (full rebuild), but skip delete on first run
+    if prev_state and current_state != prev_state:  # Only delete if prev_state exists
+        if client.collection_exists(collection_name):
+            print("Resetting collection for full rebuild.")
+            try:
+                client.delete_collection(collection_name)
+            except Exception as e:
+                print(f"Warning: Failed to delete collection: {str(e)} - Proceeding with create.")
+
+    if not client.collection_exists(collection_name):
+        print("Creating new collection.")
+        client.create_collection(
+            collection_name=collection_name,
+            vectors_config=rest.VectorParams(
+                size=1024,
+                distance=rest.Distance.COSINE
+            ),
+            hnsw_config=rest.HnswConfigDiff(
+                m=HNSW_M
+            )
+        )
+
+    if not file_paths:
+        print("No files to process.")
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
         with open(state_file, "w") as f:
             json.dump(current_state, f)
-        print(f"Full build stored {len(chunks)} chunks in {time.time() - total_start:.2f} seconds")
         return
 
     to_process = [fp for fp in file_paths if fp not in prev_state or prev_state[fp] != current_state[fp]]
@@ -163,32 +145,50 @@ def update_vector_store(data_dir, output_dir):
         print("No changes detected.")
         return
 
-    if os.path.exists(chunks_file) and os.path.exists(metadata_file):
-        with open(chunks_file, "r") as f:
-            old_chunks = json.load(f)
-        with open(metadata_file, "r") as f:
-            old_metadata = json.load(f)
-    else:
-        old_chunks, old_metadata = [], []
-
     new_chunks, new_metadata = process_files(to_process)
     if not new_chunks:
         print("No new/changed data to process.")
         return
 
-    changed_files = set(fp for fp in to_process)
-    keep_chunks = [c for c, m in zip(old_chunks, old_metadata) if m[0] not in changed_files]
-    keep_metadata = [m for m in old_metadata if m[0] not in changed_files]
+    # Generate embeddings for new chunks
+    embeddings = generate_embeddings(new_chunks)
+
+    # Get current point count for unique IDs
+    collection_info = client.get_collection(collection_name)
+    next_id = collection_info.points_count
+
+    # Validate and prepare points
+    points = []
+    for idx, (embedding, m, chunk) in enumerate(zip(embeddings, new_metadata, new_chunks)):
+        if len(embedding) != 1024:
+            print(f"Warning: Embedding {idx} has {len(embedding)} dims, expected 1024")
+        points.append(
+            rest.PointStruct(
+                id=next_id + idx,
+                vector=embedding.tolist(),
+                payload={"source": m[0], "chunk_id": m[1], "content": chunk}
+            )
+        )
+
+    # Upsert in batches with error handling
+    batch_size = 1000
+    for i in range(0, len(points), batch_size):
+        batch = points[i:i + batch_size]
+        print(f"Upserting batch {i // batch_size + 1} of {(len(points) - 1) // batch_size + 1} ({len(batch)} points)")
+        try:
+            client.upsert(collection_name=collection_name, points=batch)
+        except Exception as e:
+            print(f"Upsert failed: {str(e)}")
+            if hasattr(e, "content"):
+                print(f"Response content: {e.content}")
+            raise
     
-    all_chunks = keep_chunks + new_chunks
-    all_metadata = keep_metadata + new_metadata
-    embeddings = generate_embeddings(all_chunks)
-    store_in_faiss(embeddings, all_metadata, all_chunks, output_dir)
-    
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
     with open(state_file, "w") as f:
         json.dump(current_state, f)
     
-    print(f"Updated with {len(new_chunks)} new/changed chunks, total {len(all_chunks)} in {time.time() - total_start:.2f} seconds")
+    total_chunks = next_id + len(new_chunks)
+    print(f"Updated with {len(new_chunks)} new/changed chunks, total {total_chunks} in {time.time() - total_start:.2f} seconds")
 
 def main():
     print("Starting text extraction, embedding, and storage process...")

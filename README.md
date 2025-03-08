@@ -1,27 +1,32 @@
 # HAL: Highly Adaptable Learning AI
 
-HAL is your precision-crafted AI wingman, built to sling quality answers (50-100 tokens) from a mountain of tech docs—PDFs, DOCX, TXT—in a flash. Powered by an RTX 4080 (16GB VRAM, 14.1GB peak), i9-13900KF (20-core shredder), and 128GB RAM, HAL devours GBs (421MB in 232s) and retrieves in <0.1s. Packed with 14,658 chunks of compiler, algorithm, and data system gold, it’s your go-to for razor-sharp dev insights—fast.
+HAL is your precision-crafted AI wingman, built to deliver sharp answers (50-100 tokens) from a tech doc empire—PDFs, DOCX, TXT—in a heartbeat. Powered by an RTX 4080 (16GB VRAM, 14.1GB peak), i9-13900KF (20-core shredder), and 128GB RAM, HAL ingests 421MB in 242s and retrieves in 0.05s. With 14,658 chunks of compiler, algorithm, and software architecture gold in Qdrant, it’s your go-to for dev insights—fast and fierce.
 
 ## Features
-- **Blazing Ingestion**: 421MB (28 PDFs) in 232s—3.42s extraction, 227s embeddings, 1.63s HNSW FAISS build.
-- **Snappy Retrieval**: <0.1s via HNSW—queries land in ~0.7-1.3s total.
-- **Session Memory**: Tracks your name or last ask—resets on restart, keeps it lean.
-- **Scalable AF**: From 444 chunks (8s) to 14k (232s)—GBs? Bring it on.
+- **Blazing Ingestion**: 421MB (28 PDFs) in 242s—4.14s extraction, 227s embeddings, ~3s Qdrant upsert.
+- **Snappy Retrieval**: 0.05s via Qdrant HNSW—queries land in ~0.5-1.3s total with Llama-3.2-3B.
+- **Session Memory**: Tracks history in-run via FAISS—resets on restart, keeps it lean.
+- **Scalable AF**: From 444 chunks (8s) to 14,658 (242s)—GBs? HAL’s ready to roll.
 
 ## Tech Stack
-- **`build_db.py`**: Ingests with `thenlper/gte-large` (768D embeddings), HNSW FAISS—14,658 chunks in 232s.
-- **`hal.py`**: Runs Llama-3.2-3B via vLLM, RAG with in-run history—answers in ~1s.
+- **`build_db.py`**: Ingests with `thenlper/gte-large` (1024D embeddings), Qdrant HNSW—14,658 chunks in 242s.
+- **`hal.py`**: Runs Llama-3.2-3B via vLLM, RAG with Qdrant + FAISS history—answers in ~1s.
 - **Hardware**: RTX 4080 (14.1GB peak), i9-13900KF, 128GB RAM—speed demons unleashed.
 
 ## Current State
-- **Data**: 421MB, 28 PDFs
-- **Perf**: 232s build (14k chunks), ~1s queries—scales to GBs with <0.1s retrieval.
-- **Next**: Crank it to 1GB+—VRAM’s near 16GB max, might shard for bigger hauls.
+- **Data**: 421MB, 28 PDFs—compilers, algorithms, software arch.
+- **Perf**: 242s build (14,658 chunks), 0.05s retrieval, ~1.32s total queries—scales to GBs with room to spare.
+- **Next**: Push to 1GB+—VRAM’s near max, might shard or tweak for bigger hauls.
 
 ## Hot Deets
-- **GPU Flex**: 4080 peaked at 14.1GB—no sweat, ready for more.
-- **CPU Shred**: i9’s 20 cores ripped 14k chunks in 3.42s—extraction’s a breeze.
-- **Books**: 28 dev bibles—HAL’s a walking PhD in compilers and data systems.
+- **GPU Flex**: 4080 peaks at 14.1GB—handles `gte-large` embeddings like a champ.
+- **CPU Shred**: i9’s 20 cores tear through extraction in 4.14s—multiprocessing FTW.
+- **Books**: 28 tech bibles—HAL’s your PhD-level compiler and systems guru.
+
+## Optional Tweaks
+- **Cache Embeddings**: Pre-compute `gte-large` embeddings for common queries—drop `qdrant_time` from 0.05s to ~0.01s (Qdrant’s 3-4ms raw).
+- **Lite Embedder**: Swap to `all-MiniLM-L6-v2` (384D)—faster embedding (~10-20ms vs. 40-50ms), less precision.
+- **Sharding**: For 1GB+, shard Qdrant collections—keeps VRAM and RAM comfy.
 
 ## License
 Proprietary - see [LICENSE](LICENSE) for details. All rights reserved by Jarrod Connolly.
