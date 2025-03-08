@@ -32,3 +32,19 @@ HAL is your precision-crafted AI wingman, built to deliver sharp answers (50-100
 Proprietary - see [LICENSE](LICENSE) for details. All rights reserved by Jarrod Connolly.
 
 Thanks to Grok (xAI) for code collaboration and ideas.
+
+## Dependancies
+
+### General Text Embeddings (GTE) model (thenlper/gte-large)
+```
+@article{li2023towards,
+  title={Towards general text embeddings with multi-stage contrastive learning},
+  author={Li, Zehan and Zhang, Xin and Zhang, Yanzhao and Long, Dingkun and Xie, Pengjun and Zhang, Meishan},
+  journal={arXiv preprint arXiv:2308.03281},
+  year={2023}
+}
+```
+
+### Llama 3.2 (meta-llama/Llama-3.2-3B-Instruct)
+
+Built with Llama - see [LICENSE_LLAMA](LICENSE_LLAMA)
