@@ -1,55 +1,54 @@
 # HAL: Highly Adaptable Learning AI
 
-HAL is your precision-crafted AI wingman, delivering sharp answers (under 100 tokens) from a tech doc empire—PDFs, DOCX, TXT, MD—in a flash, styled like *WarGames*’ IMSAI 8080 screen. Powered by an RTX 4080 (16GB VRAM, 14.1GB peak), i9-13900KF (20-core shredder), and 128GB RAM, HAL ingests 421MB in 242s, retrieves in 0.05s, and streams replies live in ~1s. With 14,658 chunks of compiler, algorithm, and software architecture gold in Qdrant, it’s your go-to for dev insights—fast, fierce, and retro-cool.
+HAL is a precision-engineered AI assistant designed to deliver concise, accurate answers from a corpus of technical documents—PDFs, DOCX, TXT, and Markdown files. Built for speed and efficiency, HAL leverages Retrieval-Augmented Generation (RAG) to provide real-time responses, styled with a retro *WarGames*-inspired terminal aesthetic. It’s optimized for developers seeking fast, reliable insights from complex technical literature.
 
 ## Features
-- **Blazing Ingestion**: 421MB (28 files) in 242s—4.14s extraction, 227s embeddings, ~3s Qdrant upsert.
-- **Snappy Retrieval**: 0.05s via Qdrant HNSW—queries stream in ~0.5-1.3s total with Llama-3.2-3B.
-- **Live Streaming**: Answers trickle in real-time—no wait, just *WarGames*-style text flow.
-- **Session Memory**: FAISS tracks history in-run—resets on restart, keeps it lean.
-- **Scalable AF**: From 444 chunks (8s) to 14,658 (242s)—GBs? HAL’s got room to grow.
 
-## Tech Stack
-- **`build_db.py`**: Extracts with `pypdfium2`, `python-docx`, embeds via `thenlper/gte-large` (1024D), stores in Qdrant HNSW—14,658 chunks in 242s.
-- **`hal.py`**: FastAPI API, talks to vLLM at `localhost:8000` (Llama-3.2-3B), RAG with Qdrant + FAISS—serves `/query` and `/query_stream`.
-- **`hal_ui.py`**: `Textual` UI—whiter-cyan (#E0FFFF) text, `█` cursor, no border, streams replies, shows live Qdrant chunk count + timings.
-- **`custom_vllm.py`**: Thin client for vLLM endpoint—keeps `hal.py` lean.
-- **`start_vllm.sh`**: Fires vLLM server—`float16`, 85% GPU, 8192 max len.
-- **Hardware**: RTX 4080 (14.1GB peak), i9-13900KF, 128GB RAM—speed demons unleashed.
-- **Env**: Python 3.12.9, WSL Ubuntu 22.04, `uv` deps (`fastapi`, `uvicorn`, `httpx`, etc.).
+- **Rapid Document Ingestion**: Processes technical documents into a searchable knowledge base with high efficiency.
+- **Real-Time Query Streaming**: Delivers answers incrementally as they’re generated, minimizing wait times.
+- **Session-Based Memory**: Retains conversation history within a session using FAISS, resetting on restart for lightweight operation.
+- **Scalable Architecture**: Handles growing datasets, from small collections to gigabytes of content, with consistent performance.
+- **Retro Terminal Interface**: Features a minimalist, *WarGames*-style UI with whiter-cyan text and a live cursor.
+
+## Technology Stack
+
+- **`build_db.py`**: Extracts text using `pypdfium2` and `python-docx`, generates embeddings with `thenlper/gte-large` (1024-dimensional), and stores them in Qdrant with HNSW indexing.
+- **`hal.py`**: A FastAPI-based API serving a single `/query_stream` endpoint, interfacing with vLLM (`meta-llama/Llama-3.2-3B-Instruct`) for generation and integrating RAG via Qdrant and FAISS.
+- **`hal_ui.py`**: A `Textual`-powered UI displaying responses in whiter-cyan (#E0FFFF) text, with a `█` cursor and live metrics (chunk count, timings).
+- **`start_vllm.sh`**: Launches the vLLM server in `float16` mode, utilizing up to 85% of GPU capacity with an 8192-token maximum length.
+- **Hardware**: Powered by an NVIDIA RTX 4080 (16GB VRAM), Intel i9-13900KF (20 cores), and 128GB RAM.
+- **Environment**: Runs on Python 3.12.9 under WSL Ubuntu 22.04, with dependencies managed via `uv`.
 
 ## Current State
-- **Data**: 421MB, 28 files—compilers, algorithms, software arch.
-- **Perf**: 242s build (14,658 chunks), 0.05s retrieval, ~1s total queries—streaming feels instant.
-- **UI**: *WarGames* look—Q\nA\n\n format, no “HAL:”, live chunk count, timings from API.
-- **Setup**: `start_vllm.sh` → `hal.py` (API) → `hal_ui.py` (UI)—plug and play.
 
-## How to Run
-1. **Setup**: `uv sync` in `~/code/hal/.venv`—grabs deps from `pyproject.toml`.
-2. **vLLM**: `./start_vllm.sh`—runs Llama-3.2-3B at `localhost:8000`.
-3. **DB**: `python build_db.py`—loads docs into Qdrant (242s first run, seconds if unchanged).
-4. **API**: `python hal.py`—FastAPI at `localhost:8001`.
-5. **UI**: `python hal_ui.py`—type queries, watch HAL stream answers.
+- **Data**: Comprises 28 technical documents totaling 421MB, covering compilers, algorithms, and software architecture.
+- **Operation**: Built as a single-user, public GitHub project, with a streamlined workflow from document ingestion to query response.
+- **Interface**: Presents a clean, question-and-answer format without prefixes, displaying live Qdrant chunk counts and performance timings.
 
-## Hot Deets
-- **GPU Flex**: 4080 peaks at 14.1GB—handles `gte-large` embeddings like a champ.
-- **CPU Shred**: i9’s 20 cores tear through extraction in 4.14s—multiprocessing FTW.
-- **Books**: 28 tech bibles—HAL’s your PhD-level compiler and systems guru.
-- **UI Glow**: Whiter-cyan text, `█` cursor, no border—pure 80s terminal soul.
+## Getting Started
 
-## Optional Tweaks
-- **Cache Embeddings**: Pre-compute `gte-large` for hot queries—drop retrieval to ~0.01s.
-- **Lite Embedder**: `all-MiniLM-L6-v2` (384D)—faster (~10-20ms vs. 40-50ms), less precision.
-- **Sharding**: For 1GB+, shard Qdrant—keeps VRAM and RAM comfy.
+1. **Install Dependencies**: Run `uv sync` in `~/code/hal/.venv` to install requirements from `pyproject.toml`.
+2. **Start vLLM Server**: Execute `./start_vllm.sh` to launch Llama-3.2-3B at `localhost:8000`.
+3. **Build Database**: Use `python build_db.py` to ingest documents into Qdrant (initial run takes ~242 seconds; subsequent runs are faster if unchanged).
+4. **Launch API**: Start `python hal.py` to serve the FastAPI endpoint at `localhost:8001`.
+5. **Open UI**: Run `python hal_ui.py` to interact with HAL via the terminal interface.
+
+## Performance Highlights
+
+- **Ingestion Speed**: Processes 421MB (14,658 chunks) in 242 seconds—4.14s extraction, 227s embeddings, ~3s Qdrant upsert.
+- **Retrieval Latency**: Achieves 0.05s retrieval using Qdrant’s HNSW index.
+- **Query Response**: Streams answers in ~0.5-1.3s total, with generation peaking at 14.1GB VRAM on an RTX 4080.
+- **Scalability**: Scales from 444 chunks (8s) to 14,658 chunks (242s), with capacity for larger datasets.
 
 ## License
+
 Proprietary - see [LICENSE](LICENSE) for details. All rights reserved by Jarrod Connolly.
 
-Thanks to Grok (xAI) for code collaboration and vibes.
+Thanks to Grok (xAI) for code collaboration and development support.
 
-## Other License Attribution
+## Attribution
 
-### General Text Embeddings (GTE) model (thenlper/gte-large)
+### General Text Embeddings (GTE) Model (`thenlper/gte-large`)
 ```
 @article{li2023towards,
   title={Towards general text embeddings with multi-stage contrastive learning},
@@ -59,6 +58,5 @@ Thanks to Grok (xAI) for code collaboration and vibes.
 }
 ```
 
-### Llama 3.2 (meta-llama/Llama-3.2-3B-Instruct)
-
+### Llama 3.2 (`meta-llama/Llama-3.2-3B-Instruct`)
 Built with Llama - see [LICENSE_LLAMA](LICENSE_LLAMA)
