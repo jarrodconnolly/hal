@@ -4,13 +4,14 @@ from pydantic import BaseModel
 import httpx
 import json
 import time
-from config import VLLM_ENDPOINT, MODEL_NAME, TIMEOUT, logging
+from config import VLLM_ENDPOINT, MODEL_NAME, TIMEOUT, logging, SIMILARITY_THRESHOLD
 from retrieval import get_history_context, get_rag_context, add_to_history
+from external import fetch_external
 
 app = FastAPI()
 
 system_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id>
-You are HAL, a sharp AI with edge. Answer questions straight—keep it real. Use history for names—drop it in smooth—then context if needed. No fluff, full sentence always. Plain text only.
+You are HAL, a sharp AI with edge. Answer questions straight—keep it real. Use history and external sources—drop them in smooth—then context if needed. No fluff, full sentence always. Plain text only.
 <|end_header_id>"""
 
 user_template = """<|start_header_id|>user<|end_header_id>
@@ -29,21 +30,21 @@ async def query_hal_stream(request: QueryRequest):
     if not query:
         return StreamingResponse(iter(["No question provided."]), media_type="text/plain")
 
-    # Fetch contexts
     history_start = time.time()
     history_context = get_history_context(query)
     history_time = time.time() - history_start
 
     qdrant_start = time.time()
-    rag_context = get_rag_context(query)
+    rag_context, top_score, chunk_ids, chunk_scores = get_rag_context(query)  # Added chunk_scores
     qdrant_time = time.time() - qdrant_start
 
-    combined_context = f"{history_context}\n\n{rag_context}" if history_context else rag_context
+    external_context = fetch_external(query, top_score) if top_score < SIMILARITY_THRESHOLD else ""
+    combined_context = f"{history_context}\n\n{rag_context}\n\n{external_context}" if history_context or external_context else rag_context
     final_prompt = user_template.format(context=combined_context, question=query)
 
     async def stream_response():
         generation_start = time.time()
-        ttfb = None
+        ttfb = 0.0
         answer = ""
         payload = {
             "model": MODEL_NAME,
@@ -64,7 +65,7 @@ async def query_hal_stream(request: QueryRequest):
                             chunk_json = json.loads(data)
                             content = chunk_json["choices"][0]["delta"].get("content", "")
                             if content:
-                                if ttfb is None:
+                                if ttfb == 0.0:
                                     ttfb = time.time() - start
                                 answer += content
                                 yield content
@@ -75,9 +76,12 @@ async def query_hal_stream(request: QueryRequest):
             "history": history_time,
             "qdrant": qdrant_time,
             "generation": generation_time,
-            "ttfb": ttfb
+            "ttfb": ttfb,
+            "top_score": top_score
         }
-        logging.info(f"Query: {query} | System Prompt: {system_prompt} | User Prompt: {final_prompt} | Response: {answer} | Timings: {timings}")
+        # Log chunk IDs with their scores
+        chunk_info = {str(id): score for id, score in zip(chunk_ids, chunk_scores)}
+        logging.info(f"Query: {query} | Response: {answer} | Chunks: {json.dumps(chunk_info)} | Timings: {timings}")
         add_to_history(query, answer)
         yield f"\n\nTIMINGS:{json.dumps(timings)}"
 

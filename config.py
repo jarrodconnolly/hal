@@ -10,6 +10,7 @@ MODEL_NAME = "meta-llama/Llama-3.2-3B-Instruct"
 QDRANT_HOST = "localhost"
 QDRANT_PORT = 6333
 COLLECTION_NAME = "hal_docs"
+SIMILARITY_THRESHOLD = 0.7  # Trigger external calls below this score
 TIMEOUT = 30
 
 embeddings = HuggingFaceEmbeddings(model_name="thenlper/gte-large")
