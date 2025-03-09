@@ -1,7 +1,7 @@
 from textual.app import App, ComposeResult
 from textual.widgets import Static, Header
 from textual.containers import VerticalScroll
-from textual.events import Key
+from textual.events import Key, Paste  # Add Paste
 import httpx
 import asyncio
 import logging
@@ -79,26 +79,23 @@ class HALApp(App):
             async with client.stream(
                 "POST", "http://localhost:8001/query_stream", json={"query": query}
             ) as response:
-                answer = ""
                 timings = {}
                 buffer = ""
                 async for chunk in response.aiter_text():
                     buffer += chunk
                     if "\n\nTIMINGS:" in buffer:
                         parts = buffer.split("\n\nTIMINGS:", 1)
-                        answer = parts[0]
                         timings = json.loads(parts[1])
-                        self.console_history += answer
                         break
                     self.console_history += chunk
                     console.update(Text(self.console_history + "█"))
                     await asyncio.sleep(0.01)
                 else:
-                    self.console_history += buffer  # Fallback if no timings
+                    self.console_history += buffer
                 self.console_history += "\n\n"
                 self.current_input = ""
                 console.update(Text(self.console_history + "█"))
-            token_count = len(answer.split())
+            token_count = len(self.console_history.split())
             status.update(
                 f"{self.chunk_count} Chunks | Hist {timings.get('history', 0):.2f}s | "
                 f"Retr {timings.get('qdrant', 0):.2f}s | Gen {timings.get('generation', 0):.2f}s | "
@@ -120,6 +117,16 @@ class HALApp(App):
         elif event.key == "backspace":
             self.current_input = self.current_input[:-1]
             console.update(Text(f"{self.console_history}{self.current_input}█"))
+            scroll.scroll_end()
+
+    def on_paste(self, event: Paste) -> None:
+        console = self.query_one("#console")
+        scroll = self.query_one(VerticalScroll)
+        pasted_text = event.text.strip()  # Get clipboard content, strip newlines
+        if pasted_text:
+            self.current_input += pasted_text
+            console.update(Text(f"{self.console_history}{self.current_input}█"))
+            logging.info(f"Pasted: {self.current_input}")
             scroll.scroll_end()
 
 if __name__ == "__main__":

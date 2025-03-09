@@ -552,6 +552,7 @@ dependencies = [
     { name = "sentence-transformers" },
     { name = "textual" },
     { name = "torch" },
+    { name = "transformers" },
     { name = "uvicorn" },
     { name = "vllm" },
 ]
@@ -572,6 +573,7 @@ requires-dist = [
     { name = "sentence-transformers", specifier = ">=3.1.1" },
     { name = "textual", specifier = ">=2.1.2" },
     { name = "torch", specifier = ">=2.4.1" },
+    { name = "transformers", specifier = ">=4.49.0" },
     { name = "uvicorn", specifier = ">=0.34.0" },
     { name = "vllm", specifier = ">=0.6.2" },
 ]
