@@ -29,3 +29,6 @@ build/
 
 # .env file
 .env
+
+# local docs
+TODO.md

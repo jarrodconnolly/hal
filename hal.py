@@ -1,22 +1,13 @@
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from langchain_community.vectorstores import FAISS
-from langchain_huggingface import HuggingFaceEmbeddings
-from qdrant_client import QdrantClient
-from qdrant_client.http.models import SearchParams
-import logging
 import httpx
 import json
 import time
+from config import VLLM_ENDPOINT, MODEL_NAME, TIMEOUT, logging
+from retrieval import get_history_context, get_rag_context, add_to_history
 
-logging.basicConfig(filename="hal_api.log", level=logging.INFO, format="%(message)s")
 app = FastAPI()
-
-embeddings = HuggingFaceEmbeddings(model_name="thenlper/gte-large")
-client = QdrantClient("localhost", port=6333)
-collection_name = "hal_docs"
-history_store = FAISS.from_texts([""], embeddings)
 
 system_prompt = """<|begin_of_text|><|start_header_id|>system<|end_header_id>
 You are HAL, a sharp AI with edge. Answer questions straight—keep it real. Use history for names—drop it in smooth—then context if needed. No fluff, full sentence always. Plain text only.
@@ -38,23 +29,13 @@ async def query_hal_stream(request: QueryRequest):
     if not query:
         return StreamingResponse(iter(["No question provided."]), media_type="text/plain")
 
-    # History context
+    # Fetch contexts
     history_start = time.time()
-    docs = history_store.similarity_search(query, k=2)
-    history_context = "\n".join([doc.page_content for doc in docs])
+    history_context = get_history_context(query)
     history_time = time.time() - history_start
 
-    # Rag context
     qdrant_start = time.time()
-    query_embedding = embeddings.embed_query(query)
-    search_results = client.query_points(
-        collection_name=collection_name,
-        query=query_embedding,
-        limit=5,
-        with_payload=True,
-        search_params=SearchParams(hnsw_ef=200)
-    ).points
-    rag_context = "\n".join([result.payload.get("content", "") for result in search_results])
+    rag_context = get_rag_context(query)
     qdrant_time = time.time() - qdrant_start
 
     combined_context = f"{history_context}\n\n{rag_context}" if history_context else rag_context
@@ -65,7 +46,7 @@ async def query_hal_stream(request: QueryRequest):
         ttfb = None
         answer = ""
         payload = {
-            "model": "meta-llama/Llama-3.2-3B-Instruct",
+            "model": MODEL_NAME,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": final_prompt}
@@ -75,7 +56,7 @@ async def query_hal_stream(request: QueryRequest):
             "stream": True
         }
         async with httpx.AsyncClient() as client:
-            async with client.stream("POST", "http://localhost:8000/v1/chat/completions", json=payload, timeout=30) as response:
+            async with client.stream("POST", VLLM_ENDPOINT, json=payload, timeout=TIMEOUT) as response:
                 async for chunk in response.aiter_lines():
                     if chunk.startswith("data: "):
                         data = chunk[6:]
@@ -97,7 +78,7 @@ async def query_hal_stream(request: QueryRequest):
             "ttfb": ttfb
         }
         logging.info(f"Query: {query} | System Prompt: {system_prompt} | User Prompt: {final_prompt} | Response: {answer} | Timings: {timings}")
-        history_store.add_texts([f"Q: {query}\nA: {answer}"])
+        add_to_history(query, answer)
         yield f"\n\nTIMINGS:{json.dumps(timings)}"
 
     return StreamingResponse(stream_response(), media_type="text/plain")
