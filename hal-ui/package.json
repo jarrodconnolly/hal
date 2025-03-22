@@ -1,0 +1,25 @@
+{
+  "name": "hal-ui",
+  "description": "Highly Adaptable Learning AI",
+  "license": "All rights reserved by Jarrod Connolly",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "tauri:dev": "LIBGL_ALWAYS_SOFTWARE=1 GDK_DPI_SCALE=1.5 tauri dev",
+    "tauri:build": "tauri build",
+    "icons": "tauri icon"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.3.1",
+    "vite": "6.2.2"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "1.9.0",
+    "@opentelemetry/exporter-trace-otlp-http": "0.200.0",
+    "@opentelemetry/resources": "2.0.0",
+    "@opentelemetry/sdk-trace-web": "2.0.0"
+  }
+}

@@ -1,0 +1,78 @@
+body {
+  background: var(--bg-color, #0a1a0a); /* Dark greenish-black */
+  color: var(--text-color, #33FF33);  /* Soft CRT green */
+  font-family: 'VT323', monospace;
+  font-size: 24px; /* Synced with your bump */
+  filter: grayscale(0.9);
+  margin: 0;
+  padding: 20px;
+}
+
+#terminal {
+  height: 90vh;
+  overflow-y: auto;
+  cursor: text;
+
+}
+
+#hal-title {
+  margin-bottom: 24px;
+}
+
+.crt-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none; /* Lets clicks pass through */
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.1),
+    rgba(0, 0, 0, 0.1) 1px,
+    transparent 1px,
+    transparent 2px
+  );
+  z-index: 9999;
+
+  box-shadow: inset 0 0 75px rgba(0, 0, 0, 0.5); /* Vignette */
+  border-radius: 10px; /* Soft edge curve */
+}
+
+
+.qa-pair {
+  margin-bottom: 10px;
+}
+
+.response {
+  color: var(--response-color, #00CC00); /* Slightly darker green for responses */
+}
+
+.prompt {
+  outline: none;
+  position: relative;
+  display: inline;
+  caret-color: transparent;
+}
+
+
+
+
+.activePrompt {
+  position: relative;
+  white-space: pre-wrap; /* Ensures text wraps like a terminal */
+  word-wrap: break-word; /* Breaks long words */
+}
+
+.cursor {
+  display: inline-block;
+  width: 12px; /* Match font size */
+  height: 24px; /* Full block height */
+  background: var(--cursor-color, #00FF00); /* Green CRT glow */
+  vertical-align: bottom; /* Aligns with text baseline */
+  animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}

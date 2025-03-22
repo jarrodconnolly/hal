@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Highly Adaptable Learning AI</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background-color: #1e1e1e;
+            color: #ffffff;
+            font-family: sans-serif;
+            overflow: hidden;
+        }
+    </style>
+</head>
+
+<body>
+    <img src="images/HAL-Logo.png" alt="HAL Logo" width="1280" height="640">
+    <script>
+        const invoke = window.__TAURI__.core.invoke;
+        function sleep(seconds) {
+            return new Promise(resolve => setTimeout(resolve, seconds * 1000));
+        }
+
+        // Setup function
+        async function setup() {
+            // Fake perform some really heavy setup task
+            console.log('Performing really heavy frontend setup task...')
+            await sleep(3);
+            console.log('Frontend setup task complete!')
+            // Set the frontend task as being completed
+            invoke('set_complete', { task: 'frontend' })
+        }
+
+        // Effectively a JavaScript main function
+        window.addEventListener("DOMContentLoaded", () => {
+            setup()
+        });
+    </script>
+</body>
+
+</html>

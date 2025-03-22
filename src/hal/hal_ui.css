@@ -1,0 +1,26 @@
+Screen {
+  layout: vertical;
+  background: black;
+}
+Header {
+  color: #E0FFFF;
+  background: black;
+  height: 3;
+}
+HeaderIcon {
+  visibility: hidden;
+}
+VerticalScroll {
+  height: 1fr;
+}
+#console {
+  color: #E0FFFF;
+  background: black;
+  content-align: left top;
+  padding: 0 1;
+}
+#status {
+  color: #E0FFFF;
+  background: black;
+  padding-left: 1;
+}

@@ -1,0 +1,25 @@
+{{- bos_token }}
+{#- Extract system message if present #}
+{%- if messages[0]['role'] == 'system' %}
+    {%- set system_message = messages[0]['content']|trim %}
+    {%- set messages = messages[1:] %}
+{%- else %}
+    {%- set system_message = "" %}
+{%- endif %}
+
+{#- System block #}
+{{- "<|start_header_id|>system<|end_header_id>\\n\\n" }}
+{{- system_message }}
+{{- "<|eot_id|>" }}
+
+{#- User messages #}
+{%- for message in messages %}
+    {{- "<|start_header_id|>user<|end_header_id>\\n\\n" }}
+    {{- message['content'] | trim }}
+    {{- "<|eot_id|>" }}
+{%- endfor %}
+
+{#- Prompt assistant to generate #}
+{%- if add_generation_prompt %}
+    {{- "<|start_header_id|>assistant<|end_header_id>\\n\\n" }}
+{%- endif %}
