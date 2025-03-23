@@ -14,8 +14,11 @@ HAL is a razor-sharp AI juggernaut, forged to obliterate tech queries with blist
 
 ## Cross Platform UI
 
-<img src="https://github.com/jarrodconnolly/hal/blob/156d06d0dbf25a24d65581b4cb058482e023dfb4/.github/images/HAL-Screenshot.jpg" alt="HAL UI" />
-
+Classic green (P3) phosphors and amber (P1) phosphors for the feels.
+<div style="float:left">
+<img src="https://raw.githubusercontent.com/jarrodconnolly/hal/refs/heads/main/.github/images/HAL-Screenshot-green.png" alt="HAL UI" width="45%" />
+<img src="https://raw.githubusercontent.com/jarrodconnolly/hal/refs/heads/main/.github/images/HAL-Screenshot-amber.png" alt="HAL UI" width="45%" />
+</div>
 ## System Architecture
 
 ### Embedding/Ingestion Flow (ERD)
