@@ -1,0 +1,65 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "hal-ui",
+  "version": "1.0.0",
+  "identifier": "com.brightestcircle.hal-ui.app",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173"
+  },
+  
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "Highly Adaptable Learning AI",
+        "label": "splashscreen",
+        "url": "splashscreen.html",
+        "width": 1280,
+        "height": 640,
+        "minWidth": 1280,
+        "minHeight": 640,
+        "resizable": false,
+        "decorations": true,
+        "center": true
+      },
+      {
+        "title": "Highly Adaptable Learning AI",
+        "url": "index.html",
+        "width": 1280,
+        "height": 1024,
+        "center": true,
+        "visible": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "category": "Reference",
+    "copyright": "Brightest Circle",
+    "shortDescription": "Highly Adaptable Learning AI",
+    "longDescription": "Highly Adaptable Learning AI",
+    "targets": [
+      "deb",
+      "nsis"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "nsis": {
+        "installerIcon": "icons/icon.ico",
+        "headerImage": "../src/assets/HAL Logo.bmp"
+      }
+    }
+  }
+}

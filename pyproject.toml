@@ -1,0 +1,65 @@
+[project]
+name = "hal"
+version = "1.0.0"
+description = "Highly Adaptable Learning AI"
+authors = [{ name = "Jarrod Connolly" }]
+requires-python = ">=3.12,<3.13"
+
+dependencies = [
+    "datasets>=3.4.0",
+    "fastapi~=0.115.11",
+    "gptqmodel>=2.1.0",
+    "httpx~=0.28.1",
+    "mistune>=3.1.2",
+    "nltk>=3.9.1",
+    "pydantic~=2.10.6",
+    "pymupdf4llm>=0.0.17",
+    "qdrant-client~=1.13.3",
+    "rich~=13.9.4",
+    "scikit-learn>=1.6.1",
+    "sentence-transformers~=3.4.1",
+    "spacy~=3.8.4",
+    "textual~=2.1.2",
+    "vllm~=0.7.3",
+    "torch~=2.5.1",
+    "torchvision~=0.20.1",
+    "tqdm>=4.67.1",
+    "transformers==4.48.2",
+    "uvicorn~=0.34.0",
+    "structlog>=25.2.0",
+    "en-core-web-sm",
+    "en-core-web-lg",
+    "motor>=3.7.0",
+    "argon2-cffi>=23.1.0",
+    "opentelemetry-sdk>=1.31.0",
+    "opentelemetry-instrumentation-fastapi>=0.52b0",
+    "opentelemetry-instrumentation-httpx>=0.52b0",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.31.0",
+    "toml>=0.10.2",
+    "opentelemetry-instrumentation-pymongo>=0.52b0",
+]
+
+[dependency-groups]
+dev = ["deptry>=0.23.0", "ruff>=0.11.0"]
+
+[project.scripts]
+vllm_server = "hal.vllm_server:start_vllm_server"
+hal = "hal.hal:main"
+hal_ui = "hal.hal_ui:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.uv]
+index-url = "https://pypi.org/simple/"
+
+[tool.uv.sources]
+en-core-web-sm = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0.tar.gz" }
+en-core-web-lg = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0.tar.gz" }
+
+[tool.deptry]
+ignore = ["DEP004"]
+
+[tool.ruff]
+extend-exclude = ["hal-ui", "build"]
