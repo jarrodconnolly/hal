@@ -19,6 +19,7 @@ Classic green (P3) phosphors and amber (P1) phosphors for the feels.
 <img src="https://raw.githubusercontent.com/jarrodconnolly/hal/refs/heads/main/.github/images/HAL-Screenshot-green.png" alt="HAL UI" width="45%" />
 <img src="https://raw.githubusercontent.com/jarrodconnolly/hal/refs/heads/main/.github/images/HAL-Screenshot-amber.png" alt="HAL UI" width="45%" />
 </div>
+
 ## System Architecture
 
 ### Embedding/Ingestion Flow (ERD)
